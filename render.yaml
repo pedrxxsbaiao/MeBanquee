@@ -18,4 +18,11 @@ services:
       - key: CLOUDINARY_API_KEY
         sync: false
       - key: CLOUDINARY_API_SECRET
-        sync: false 
+        sync: false
+    build:
+      commands:
+        - npm install
+        - npm run build
+    start:
+      commands:
+        - npm start 
