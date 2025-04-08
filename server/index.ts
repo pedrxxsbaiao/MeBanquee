@@ -1,12 +1,39 @@
 import express from "express";
-import { registerRoutes } from "./routes";
+import routes from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupStorage } from "./storage";
+import session from "express-session";
 import fileUpload from "express-fileupload";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(fileUpload());
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: "/tmp/"
+}));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || "sugar-connection-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000 // 24 horas
+  }
+}));
+
+setupStorage(app);
+
+app.use("/api", routes);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -49,12 +76,13 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // all other middleware is registered
   if (process.env.NODE_ENV !== "production") {
     await setupVite(app);
   } else {
-    app.use(serveStatic());
+    app.use(express.static(path.join(__dirname, "../dist/client")));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(__dirname, "../dist/client/index.html"));
+    });
   }
 
   const port = process.env.PORT || 3000;
